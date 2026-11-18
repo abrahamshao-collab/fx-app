@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>外幣匯率換算 & 旅遊購物助手</title>
+
+  <!-- PWA 設定：加入主畫面後以獨立 App 開啟，可離線使用 -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="外幣換算">
+  <meta name="theme-color" content="#0f172a">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; }
+    html { background-color: #0f172a; }
+    body {
+      background-color: #0f172a; color: #f8fafc; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: calc(14px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
+      -webkit-user-select: none; user-select: none;
+    }
+    input, select { -webkit-user-select: text; user-select: text; }
+    .container { width: 100%; max-width: 480px; }
+
+    .card { background: #1e293b; border-radius: 16px; padding: 18px; margin-bottom: 14px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+
+    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    h1 { font-size: 19px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; }
+    .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .sync-btn { background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 6px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: 0.2s; flex-shrink: 0; }
+    .sync-btn:active { background: #334155; transform: scale(0.96); }
+
+    .currency-select-box { margin-bottom: 12px; background: #0f172a; border: 1.5px solid #38bdf8; border-radius: 10px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; }
+    .currency-select-box label { font-size: 12px; color: #38bdf8; font-weight: 600; }
+    .currency-dropdown { background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 6px 10px; font-size: 14px; font-weight: bold; outline: none; }
+
+    .status-bar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #94a3b8; margin-bottom: 14px; padding: 6px 10px; background: #0f172a; border-radius: 8px; border: 1px solid #1e293b; gap: 8px; }
+    .status-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+    .status-online { background-color: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .status-offline { background-color: #eab308; }
+
+    .rate-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
+    .rate-btn { background: #0f172a; border: 1.5px solid #334155; color: #94a3b8; padding: 9px; border-radius: 10px; font-size: 12px; text-align: left; cursor: pointer; transition: 0.15s; }
+    .rate-btn.active { border-color: #38bdf8; background: #0369a1; color: #ffffff; }
+    .rate-btn strong { display: block; font-size: 15px; color: #fff; margin-top: 2px; }
+    .rate-btn.active strong { color: #f0f9ff; }
+    .rate-btn span { display: block; font-size: 10.5px; opacity: 0.85; margin-top: 2px; }
+
+    .custom-rate-box { display: flex; align-items: center; justify-content: space-between; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 6px 12px; margin-bottom: 14px; font-size: 12px; color: #cbd5e1; }
+    .custom-rate-box.active { border-color: #38bdf8; }
+    .custom-rate-input { width: 100px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; color: #38bdf8; font-weight: bold; padding: 4px 8px; text-align: right; font-size: 16px; }
+
+    .input-group { margin-bottom: 10px; }
+    .input-label { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #94a3b8; margin-bottom: 6px; }
+    .copy-btn { background: transparent; border: none; color: #38bdf8; font-size: 11.5px; cursor: pointer; padding: 2px 4px; }
+    .input-box { display: flex; align-items: center; background: #0f172a; border: 1.5px solid #334155; border-radius: 12px; padding: 0 14px; }
+    .input-box:focus-within { border-color: #38bdf8; }
+    .input-box span { font-size: 18px; font-weight: 700; color: #38bdf8; margin-right: 8px; min-width: 20px; white-space: nowrap; }
+    .input-box input { width: 100%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 24px; font-weight: bold; padding: 10px 0; }
+
+    .btn-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+    .pill-btn { background: #334155; border: none; color: #e2e8f0; padding: 8px 0; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .pill-btn:active { background: #475569; }
+    .pill-btn.clear { background: #991b1b; color: #fecaca; }
+
+    .benchmarks-title { font-size: 12px; color: #94a3b8; margin: 12px 0 6px 0; }
+    .benchmark-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { background: #0f172a; border: 1px solid #334155; border-radius: 20px; padding: 5px 10px; font-size: 11px; color: #cbd5e1; cursor: pointer; }
+    .chip:active { border-color: #38bdf8; color: #38bdf8; }
+
+    .shop-title { font-size: 14px; font-weight: 700; color: #fbbf24; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .toggle-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .toggle-btn { flex: 1; padding: 7px 4px; font-size: 12px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer; font-weight: 600; }
+    .toggle-btn.active { background: #d97706; color: #fff; border-color: #f59e0b; }
+
+    .shop-box { background: #0f172a; border-radius: 12px; padding: 12px; border: 1px solid #334155; font-size: 12.5px; }
+    .shop-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: #cbd5e1; gap: 8px; }
+    .shop-row .val { text-align: right; }
+    .shop-row small { display: block; font-size: 10.5px; color: #94a3b8; font-weight: normal; }
+    .highlight { color: #34d399; font-weight: 700; font-size: 14px; }
+    .tag { white-space: nowrap; flex-shrink: 0; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #166534; color: #bbf7d0; }
+    .tag.warn { background: #854d0e; color: #fef08a; }
+    .note { font-size: 10.5px; color: #94a3b8; line-height: 1.5; margin-top: 8px; }
+
+    .settings-subgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #334155; }
+    .setting-item { font-size: 11px; color: #94a3b8; }
+    .setting-item select { width: 100%; background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 6px; padding: 5px 4px; margin-top: 4px; font-size: 12px; }
+
+    .table-toggle-btn { width: 100%; background: transparent; border: 1px dashed #475569; color: #94a3b8; padding: 9px; border-radius: 8px; font-size: 12px; cursor: pointer; margin-top: 4px; }
+    .ladder-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; text-align: right; }
+    .ladder-table th { color: #94a3b8; font-weight: 600; padding: 6px 6px; border-bottom: 1px solid #334155; }
+    .ladder-table td { padding: 6px 6px; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+    .ladder-table td:first-child, .ladder-table th:first-child { text-align: left; }
+
+    /* 安裝提示 */
+    .install-card { background: #0c4a6e; border: 1px solid #38bdf8; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 12.5px; color: #e0f2fe; display: none; line-height: 1.6; }
+    .install-card .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .install-card button { background: #38bdf8; color: #0f172a; border: none; border-radius: 8px; padding: 6px 12px; font-weight: 700; font-size: 12px; cursor: pointer; }
+    .install-card .x { background: transparent; color: #7dd3fc; padding: 4px 6px; }
+
+    .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: #334155; color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 13px; opacity: 0; transition: 0.25s; pointer-events: none; z-index: 10; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- 安裝到主畫面提示（只在瀏覽器中、尚未安裝時出現） -->
+    <div class="install-card" id="installCard">
+      <div class="row">
+        <strong>📲 加入主畫面，離線也能用</strong>
+        <button class="x" onclick="dismissInstall()">✕</button>
+      </div>
+      <div id="installHint"></div>
+    </div>
+
+    <div class="card">
+      <div class="header-row">
+        <div>
+          <h1 id="appTitle">🇯🇵 日圓 / 台幣換算 🇹🇼</h1>
+          <div class="sub">四價依國際中間價推估臺銀價差 · 可自訂實際匯率</div>
+        </div>
+        <button class="sync-btn" onclick="fetchLiveRates(true)">
+          <span>🔄</span> 同步
+        </button>
+      </div>
+
+      <div class="currency-select-box">
+        <label for="currencySelect">選擇幣別：</label>
+        <select id="currencySelect" class="currency-dropdown" onchange="onCurrencyChange()">
+          <option value="JPY" selected>🇯🇵 JPY 日圓</option>
+          <option value="USD">🇺🇸 USD 美元</option>
+          <option value="EUR">🇪🇺 EUR 歐元</option>
+          <option value="CNY">🇨🇳 CNY 人民幣</option>
+          <option value="HKD">🇭🇰 HKD 港幣</option>
+          <option value="KRW">🇰🇷 KRW 韓元</option>
+          <option value="GBP">🇬🇧 GBP 英鎊</option>
+          <option value="AUD">🇦🇺 AUD 澳幣</option>
+          <option value="THB">🇹🇭 THB 泰銖</option>
+          <option value="SGD">🇸🇬 SGD 新加坡幣</option>
+          <option value="CAD">🇨🇦 CAD 加幣</option>
+          <option value="NZD">🇳🇿 NZD 紐元</option>
+          <option value="CHF">🇨🇭 CHF 瑞士法郎</option>
+          <option value="VND">🇻🇳 VND 越南盾</option>
+          <option value="MYR">🇲🇾 MYR 馬來幣</option>
+          <option value="PHP">🇵🇭 PHP 菲律賓披索</option>
+          <option value="IDR">🇮🇩 IDR 印尼盾</option>
+          <option value="SEK">🇸🇪 SEK 瑞典幣</option>
+          <option value="ZAR">🇿🇦 ZAR 南非幣</option>
+        </select>
+      </div>
+
+      <div class="status-bar">
+        <div>
+          <span id="statusDot" class="status-indicator status-offline"></span>
+          <span id="statusText">載入中...</span>
+        </div>
+        <span id="updateTime">--</span>
+      </div>
+
+      <div class="rate-grid">
+        <button id="btn-cashSell" class="rate-btn active" onclick="selectRateMode('cashSell')">
+          現金賣出 <strong id="valCashSell">-</strong>
+          <span>出國臨櫃領現鈔</span>
+        </button>
+        <button id="btn-spotSell" class="rate-btn" onclick="selectRateMode('spotSell')">
+          即期賣出 <strong id="valSpotSell">-</strong>
+          <span>網銀換匯 / 雙幣卡</span>
+        </button>
+        <button id="btn-cashBuy" class="rate-btn" onclick="selectRateMode('cashBuy')">
+          現金買入 <strong id="valCashBuy">-</strong>
+          <span>外幣現鈔換回台幣</span>
+        </button>
+        <button id="btn-spotBuy" class="rate-btn" onclick="selectRateMode('spotBuy')">
+          即期買入 <strong id="valSpotBuy">-</strong>
+          <span>帳戶外幣賣回台幣</span>
+        </button>
+      </div>
+
+      <div class="custom-rate-box" id="customRateBox">
+        <span>自訂 / 實際換匯成本：</span>
+        <input type="number" step="any" inputmode="decimal" id="customRateInput" class="custom-rate-input" placeholder="0.0000" oninput="applyCustomRate()">
+      </div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span id="foreignCurrencyLabel">日圓 (JPY)</span>
+          <button class="copy-btn" onclick="copyAmount('foreign')">複製</button>
+        </div>
+        <div class="input-box">
+          <span id="foreignSymbol">¥</span>
+          <input type="number" id="foreignInput" placeholder="0" inputmode="decimal" oninput="calcFromForeign()">
+        </div>
+      </div>
+
+      <div class="btn-row" id="quickBtnRow"></div>
+
+      <div class="input-group">
+        <div class="input-label">
+          <span>新台幣 (TWD)</span>
+          <button class="copy-btn" onclick="copyAmount('twd')">複製</button>
+        </div>
+        <div class="input-box">
+          <span>NT$</span>
+          <input type="number" id="twdInput" placeholder="0" inputmode="decimal" oninput="calcFromTwd()">
+        </div>
+      </div>
+
+      <div id="benchmarkSection">
+        <div class="benchmarks-title">✈️ 常見開銷快速代入：</div>
+        <div class="benchmark-chips">
+          <span class="chip" onclick="setBenchmark(180)">超商綠茶 ¥180</span>
+          <span class="chip" onclick="setBenchmark(980)">一蘭拉麵 ¥980</span>
+          <span class="chip" onclick="setBenchmark(800)">地鐵一日券 ¥800</span>
+          <span class="chip" onclick="setBenchmark(2500)">展望台門票 ¥2,500</span>
+          <span class="chip" onclick="setBenchmark(4500)">居酒屋人均 ¥4,500</span>
+          <span class="chip" onclick="setBenchmark(8400)">迪士尼門票 ¥8,400</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 退稅與刷卡試算 -->
+    <div class="card">
+      <div class="shop-title">
+        <span id="shopTitleText">🛍️ 日本退稅 & 刷卡淨省實算</span>
+        <span id="rateLabel" style="font-size: 11px; font-weight: normal; color: #94a3b8;"></span>
+      </div>
+
+      <div id="jpyOnlyControls">
+        <div class="toggle-row">
+          <button id="btnTaxInc" class="toggle-btn active" onclick="setTaxMode(true)">輸入含稅價 (税込)</button>
+          <button id="btnTaxExc" class="toggle-btn" onclick="setTaxMode(false)">輸入未稅價 (税抜)</button>
+        </div>
+        <div class="toggle-row">
+          <button id="btnRate10" class="toggle-btn active" onclick="setTaxRate(10)">一般商品 10%</button>
+          <button id="btnRate8" class="toggle-btn" onclick="setTaxRate(8)">食品飲料 8%</button>
+        </div>
+      </div>
+
+      <div class="shop-box">
+        <div id="jpyRows">
+          <div class="shop-row">
+            <span>免稅門檻 (同店同日未稅 ¥5,000)：</span>
+            <span id="taxTag" class="tag warn">尚未達標</span>
+          </div>
+          <div class="shop-row" style="margin-top: 8px;">
+            <span>結帳時刷卡 (含稅)：</span>
+            <span class="val"><span id="chargeJpy">¥ 0</span><small id="chargeTwd">NT$ 0</small></span>
+          </div>
+          <div class="shop-row">
+            <span>出境後可退回：</span>
+            <span class="val"><span id="refundJpy" style="color:#fbbf24;">¥ 0</span><small id="refundTwd">NT$ 0</small></span>
+          </div>
+        </div>
+        <div class="shop-row" style="margin-top: 6px;">
+          <span id="finalLabel">退稅後實際成本：</span>
+          <span class="val"><span id="finalTwd" class="highlight">NT$ 0</span><small id="finalForeign">¥ 0</small></span>
+        </div>
+        <div class="shop-row" style="margin-top: 6px; font-size: 12px; color: #67e8f9;">
+          <span>信用卡回饋扣 1.5% 手續費後淨賺：</span>
+          <span id="cardBenefit" style="font-weight: bold;">NT$ 0</span>
+        </div>
+        <div class="shop-row" style="font-size: 11.5px; color: #94a3b8; border-top: 1px dashed #334155; margin-top: 8px; padding-top: 6px;">
+          <span>相比原價整體共省下：</span>
+          <span id="totalSavedTwd" style="color: #34d399; font-weight: bold;">NT$ 0</span>
+        </div>
+
+        <div class="settings-subgrid">
+          <div class="setting-item" id="feeWrapper">
+            <label for="feeRateSelect">退稅手續費 (依店家)：</label>
+            <select id="feeRateSelect" onchange="onSettingChange()">
+              <option value="0">0% (無手續費)</option>
+              <option value="1.55" selected>1.55% (百貨常見)</option>
+              <option value="2.5">2.5%</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label for="cardRewardSelect">海外信用卡回饋率：</label>
+            <select id="cardRewardSelect" onchange="onSettingChange()">
+              <option value="3.0" selected>3.0% (淨賺 1.5%)</option>
+              <option value="3.5">3.5% (淨賺 2.0%)</option>
+              <option value="4.5">4.5% (淨賺 3.0%)</option>
+              <option value="1.5">1.5% (剛好打平)</option>
+            </select>
+          </div>
+        </div>
+        <div class="note" id="taxNote">
+          ※ 2026/11/1 起日本退稅改為「先付後退」：結帳先付含稅價，需在購買日起 90 天內出境、於機場海關確認後才退款；退款方式與手續費依店家而定。信用卡回饋以退稅後金額保守估算。
+        </div>
+      </div>
+    </div>
+
+    <!-- 階梯速查表 -->
+    <div class="card">
+      <button class="table-toggle-btn" onclick="toggleLadderTable()">
+        📊 展開 / 收合「外幣 / 台幣 雙向速查表」
+      </button>
+      <div id="ladderSection" style="display: none;">
+        <table class="ladder-table">
+          <thead>
+            <tr>
+              <th id="thForeign">日圓 (JPY)</th>
+              <th>折合台幣</th>
+              <th>台幣</th>
+              <th id="thForeignRev">折合日圓</th>
+            </tr>
+          </thead>
+          <tbody id="ladderBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ===== 幣別設定（defaultRate 只在第一次開啟且無網路時使用） =====
+    const CURRENCY_CONFIG = {
+      JPY: { name: "日圓", symbol: "¥", flag: "🇯🇵", defaultRate: 0.2104, magnitude: "small" },
+      USD: { name: "美元", symbol: "$", flag: "🇺🇸", defaultRate: 32.55, magnitude: "large" },
+      EUR: { name: "歐元", symbol: "€", flag: "🇪🇺", defaultRate: 34.20, magnitude: "large" },
+      CNY: { name: "人民幣", symbol: "¥", flag: "🇨🇳", defaultRate: 4.48, magnitude: "medium" },
+      HKD: { name: "港幣", symbol: "HK$", flag: "🇭🇰", defaultRate: 4.18, magnitude: "medium" },
+      KRW: { name: "韓元", symbol: "₩", flag: "🇰🇷", defaultRate: 0.0235, magnitude: "small" },
+      GBP: { name: "英鎊", symbol: "£", flag: "🇬🇧", defaultRate: 41.20, magnitude: "large" },
+      AUD: { name: "澳幣", symbol: "A$", flag: "🇦🇺", defaultRate: 21.10, magnitude: "large" },
+      THB: { name: "泰銖", symbol: "฿", flag: "🇹🇭", defaultRate: 0.94, magnitude: "medium" },
+      SGD: { name: "新加坡幣", symbol: "S$", flag: "🇸🇬", defaultRate: 24.30, magnitude: "large" },
+      CAD: { name: "加幣", symbol: "C$", flag: "🇨🇦", defaultRate: 23.20, magnitude: "large" },
+      NZD: { name: "紐元", symbol: "NZ$", flag: "🇳🇿", defaultRate: 19.20, magnitude: "large" },
+      CHF: { name: "瑞士法郎", symbol: "CHF", flag: "🇨🇭", defaultRate: 36.80, magnitude: "large" },
+      VND: { name: "越南盾", symbol: "₫", flag: "🇻🇳", defaultRate: 0.0013, magnitude: "micro" },
+      MYR: { name: "馬來幣", symbol: "RM", flag: "🇲🇾", defaultRate: 7.30, magnitude: "medium" },
+      PHP: { name: "菲律賓披索", symbol: "₱", flag: "🇵🇭", defaultRate: 0.56, magnitude: "medium" },
+      IDR: { name: "印尼盾", symbol: "Rp", flag: "🇮🇩", defaultRate: 0.0021, magnitude: "micro" },
+      SEK: { name: "瑞典幣", symbol: "kr", flag: "🇸🇪", defaultRate: 3.05, magnitude: "medium" },
+      ZAR: { name: "南非幣", symbol: "R", flag: "🇿🇦", defaultRate: 1.80, magnitude: "medium" }
+    };
+
+    // 臺銀四價相對中間價的估計價差
+    const SPREAD = { cashSell: 1.008, spotSell: 1.001, cashBuy: 0.948, spotBuy: 0.982 };
+    const RATES_KEY = 'fx_rates_v2';
+    const PREFS_KEY = 'fx_prefs_v1';
+
+    let currentCur = 'JPY';
+    let allRates = {};       // { JPY: {cashSell,...}, ... }
+    let ratesUpdatedAt = 0;  // 毫秒時間戳；0 = 內建預設值
+    let activeMode = 'cashSell';
+    let customRates = {};
+    let isPriceTaxInclusive = true;
+    let jpTaxRate = 10;
+
+    // ===== 安全的 localStorage =====
+    function store(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+    function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
+
+    // 小數位：大於 1 的匯率留 4 位，小額幣別保留 4 位有效數字（避免越南盾、印尼盾變 0）
+    function roundRate(v) { return v >= 1 ? Number(v.toFixed(4)) : Number(v.toPrecision(4)); }
+    function buildFour(mid) {
+      const o = {};
+      for (const k in SPREAD) o[k] = roundRate(mid * SPREAD[k]);
+      return o;
+    }
+    function fmtTime(ts) {
+      if (!ts) return '內建預設值';
+      const d = new Date(ts), p = n => String(n).padStart(2, '0');
+      return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      for (const cur in CURRENCY_CONFIG) allRates[cur] = buildFour(CURRENCY_CONFIG[cur].defaultRate);
+      loadCache();
+      loadPrefs();
+      updateCurrencyUI();
+      setStatus(false, ratesUpdatedAt ? '離線快取' : '尚未取得匯率');
+      fetchLiveRates(false);
+      setupInstallHint();
+    });
+    window.addEventListener('online', () => fetchLiveRates(false));
+
+    function loadCache() {
+      const c = load(RATES_KEY);
+      if (c && c.rates) {
+        for (const cur in c.rates) if (CURRENCY_CONFIG[cur]) allRates[cur] = c.rates[cur];
+        ratesUpdatedAt = c.updatedAt || 0;
+      }
+    }
+
+    function loadPrefs() {
+      const p = load(PREFS_KEY);
+      if (!p) return;
+      if (p.cur && CURRENCY_CONFIG[p.cur]) currentCur = p.cur;
+      if (p.mode) activeMode = p.mode;
+      if (p.customRates) customRates = p.customRates;
+      if (typeof p.taxInc === 'boolean') isPriceTaxInclusive = p.taxInc;
+      if (p.taxRate) jpTaxRate = p.taxRate;
+      if (p.fee != null) document.getElementById('feeRateSelect').value = p.fee;
+      if (p.card != null) document.getElementById('cardRewardSelect').value = p.card;
+      document.getElementById('currencySelect').value = currentCur;
+      if (activeMode === 'custom' && !customRates[currentCur]) activeMode = 'cashSell';
+      setTaxMode(isPriceTaxInclusive, true);
+      setTaxRate(jpTaxRate, true);
+    }
+
+    function savePrefs() {
+      store(PREFS_KEY, {
+        cur: currentCur, mode: activeMode, customRates,
+        taxInc: isPriceTaxInclusive, taxRate: jpTaxRate,
+        fee: document.getElementById('feeRateSelect').value,
+        card: document.getElementById('cardRewardSelect').value
+      });
+    }
+
+    async function fetchLiveRates(manual = false) {
+      if (!navigator.onLine) {
+        setStatus(false, ratesUpdatedAt ? '離線中 (使用快取)' : '離線中 (內建預設值)');
+        if (manual) toast('目前離線，沿用上次匯率');
+        return;
+      }
+      if (manual) document.getElementById('statusText').innerText = '同步中...';
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch('https://open.er-api.com/v6/latest/TWD', { signal: controller.signal, cache: 'no-store' });
+        clearTimeout(timeoutId);
+        const data = await res.json();
+        if (!data || !data.rates) throw new Error('bad data');
+
+        for (const cur in CURRENCY_CONFIG) {
+          if (data.rates[cur]) allRates[cur] = buildFour(1 / data.rates[cur]); // 1 外幣 = ? 台幣
+        }
+        ratesUpdatedAt = Date.now();
+        store(RATES_KEY, { rates: allRates, updatedAt: ratesUpdatedAt });
+        setStatus(true, '已更新 (國際中間價)');
+        renderAll();
+        if (manual) toast('匯率已更新');
+      } catch (err) {
+        setStatus(false, ratesUpdatedAt ? '連線失敗 (使用快取)' : '連線失敗 (內建預設值)');
+        if (manual) toast('無法連線，沿用上次匯率');
+      }
+    }
+
+    function setStatus(online, msg) {
+      document.getElementById('statusDot').className = 'status-indicator ' + (online ? 'status-online' : 'status-offline');
+      document.getElementById('statusText').innerText = msg;
+      document.getElementById('updateTime').innerText = ratesUpdatedAt ? `匯率時間 ${fmtTime(ratesUpdatedAt)}` : '內建預設值';
+    }
+
+    function onCurrencyChange() {
+      currentCur = document.getElementById('currencySelect').value;
+      if (activeMode === 'custom' && !customRates[currentCur]) activeMode = 'cashSell';
+      document.getElementById('foreignInput').value = '';
+      document.getElementById('twdInput').value = '';
+      updateCurrencyUI();
+      savePrefs();
+    }
+
+    function updateCurrencyUI() {
+      const conf = CURRENCY_CONFIG[currentCur];
+      document.getElementById('appTitle').innerText = `${conf.flag} ${conf.name} / 台幣換算 🇹🇼`;
+      document.getElementById('foreignCurrencyLabel').innerText = `${conf.name} (${currentCur})`;
+      document.getElementById('foreignSymbol').innerText = conf.symbol;
+      document.getElementById('thForeign').innerText = `${conf.name}`;
+      document.getElementById('thForeignRev').innerText = `折合${conf.name}`;
+      updateQuickButtons(conf.magnitude);
+
+      const isJpy = currentCur === 'JPY';
+      ['benchmarkSection', 'jpyOnlyControls', 'jpyRows', 'feeWrapper', 'taxNote'].forEach(id => {
+        document.getElementById(id).style.display = isJpy ? '' : 'none';
+      });
+      document.getElementById('shopTitleText').innerText = isJpy ? '🛍️ 日本退稅 & 刷卡淨省實算' : '💳 海外刷卡淨回饋試算';
+      document.getElementById('finalLabel').innerText = isJpy ? '退稅後實際成本：' : '刷卡金額折合台幣：';
+      renderAll();
+    }
+
+    function renderAll() {
+      renderRatesUI();
+      renderLadder();
+      calcFromForeign();
+    }
+
+    function updateQuickButtons(magnitude) {
+      let vals = [1000, 5000, 10000, 50000], labels = ['+1千', '+5千', '+1萬', '+5萬'];
+      if (magnitude === 'large')  { vals = [10, 50, 100, 500];          labels = ['+10', '+50', '+100', '+500']; }
+      if (magnitude === 'medium') { vals = [100, 500, 1000, 5000];      labels = ['+100', '+500', '+1千', '+5千']; }
+      if (magnitude === 'micro')  { vals = [10000, 50000, 100000, 500000]; labels = ['+1萬', '+5萬', '+10萬', '+50萬']; }
+      document.getElementById('quickBtnRow').innerHTML =
+        vals.map((v, i) => `<button class="pill-btn" onclick="addAmount(${v})">${labels[i]}</button>`).join('') +
+        `<button class="pill-btn clear" onclick="clearAll()">清除</button>`;
+    }
+
+    function renderRatesUI() {
+      const r = allRates[currentCur];
+      document.getElementById('valCashSell').innerText = r.cashSell;
+      document.getElementById('valSpotSell').innerText = r.spotSell;
+      document.getElementById('valCashBuy').innerText = r.cashBuy;
+      document.getElementById('valSpotBuy').innerText = r.spotBuy;
+      document.querySelectorAll('.rate-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-' + activeMode));
+      document.getElementById('customRateBox').classList.toggle('active', activeMode === 'custom');
+      const inp = document.getElementById('customRateInput');
+      if (document.activeElement !== inp) inp.value = customRates[currentCur] || '';
+      document.getElementById('rateLabel').innerText = `1 ${currentCur} = NT$ ${getCurrentRate()}`;
+    }
+
+    function selectRateMode(mode) {
+      activeMode = mode;
+      delete customRates[currentCur];
+      document.getElementById('customRateInput').value = '';
+      renderAll();
+      savePrefs();
+    }
+
+    function applyCustomRate() {
+      const val = parseFloat(document.getElementById('customRateInput').value);
+      if (val > 0) {
+        activeMode = 'custom';
+        customRates[currentCur] = val;
+      } else {
+        delete customRates[currentCur];
+        if (activeMode === 'custom') activeMode = 'cashSell';
+      }
+      renderAll();
+      savePrefs();
+    }
+
+    function getCurrentRate() {
+      if (activeMode === 'custom' && customRates[currentCur]) return customRates[currentCur];
+      return allRates[currentCur]?.[activeMode] || CURRENCY_CONFIG[currentCur].defaultRate;
+    }
+
+    function foreignDecimals() {
+      const m = CURRENCY_CONFIG[currentCur].magnitude;
+      return (m === 'small' || m === 'micro') ? 0 : 2;
+    }
+
+    function calcFromForeign() {
+      const foreign = parseFloat(document.getElementById('foreignInput').value) || 0;
+      document.getElementById('twdInput').value = foreign > 0 ? Math.round(foreign * getCurrentRate()) : '';
+      updateShopCalc(foreign);
+    }
+
+    function calcFromTwd() {
+      const twd = parseFloat(document.getElementById('twdInput').value) || 0;
+      const foreign = Number((twd / getCurrentRate()).toFixed(foreignDecimals()));
+      document.getElementById('foreignInput').value = twd > 0 ? foreign : '';
+      updateShopCalc(foreign);
+    }
+
+    function addAmount(amount) {
+      const curr = parseFloat(document.getElementById('foreignInput').value) || 0;
+      document.getElementById('foreignInput').value = curr + amount;
+      calcFromForeign();
+    }
+
+    function setBenchmark(amount) {
+      document.getElementById('foreignInput').value = amount;
+      calcFromForeign();
+    }
+
+    function clearAll() {
+      document.getElementById('foreignInput').value = '';
+      document.getElementById('twdInput').value = '';
+      updateShopCalc(0);
+    }
+
+    function copyAmount(type) {
+      const val = document.getElementById(type === 'foreign' ? 'foreignInput' : 'twdInput').value;
+      if (!val) return;
+      const done = () => toast(`已複製：${val}`);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(done).catch(() => fallbackCopy(val, done));
+      } else fallbackCopy(val, done);
+    }
+    function fallbackCopy(text, cb) {
+      const t = document.createElement('textarea');
+      t.value = text; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); cb(); } catch (e) {}
+      t.remove();
+    }
+
+    function setTaxMode(isInc, silent) {
+      isPriceTaxInclusive = isInc;
+      document.getElementById('btnTaxInc').classList.toggle('active', isInc);
+      document.getElementById('btnTaxExc').classList.toggle('active', !isInc);
+      if (!silent) { calcAll(); savePrefs(); }
+    }
+
+    function setTaxRate(rate, silent) {
+      jpTaxRate = rate;
+      document.getElementById('btnRate10').classList.toggle('active', rate === 10);
+      document.getElementById('btnRate8').classList.toggle('active', rate === 8);
+      if (!silent) { calcAll(); savePrefs(); }
+    }
+
+    function onSettingChange() { calcAll(); savePrefs(); }
+
+    function calcAll() {
+      updateShopCalc(parseFloat(document.getElementById('foreignInput').value) || 0);
+    }
+
+    const ntd = v => `NT$ ${Math.round(v).toLocaleString()}`;
+    const setText = (id, txt) => { document.getElementById(id).innerText = txt; };
+
+    function updateShopCalc(amount) {
+      const rate = getCurrentRate();
+      const feePct = parseFloat(document.getElementById('feeRateSelect').value) || 0;
+      const rewardPct = parseFloat(document.getElementById('cardRewardSelect').value);
+      const netRewardRate = Math.max(0, (rewardPct - 1.5) / 100);
+
+      if (currentCur === 'JPY') {
+        const t = jpTaxRate / 100;
+        const netPrice = isPriceTaxInclusive ? Math.round(amount / (1 + t)) : amount;   // 未稅價
+        const incPrice = isPriceTaxInclusive ? amount : Math.round(amount * (1 + t));   // 含稅價（結帳實付）
+        const eligible = amount > 0 && netPrice >= 5000;
+
+        const tag = document.getElementById('taxTag');
+        tag.className = eligible ? 'tag' : 'tag warn';
+        tag.innerText = eligible ? '達門檻，可退稅' : '未達 ¥5,000';
+
+        // 新制：先付含稅價，出境後退回「消費稅 − 手續費」；手續費以含稅價計
+        const tax = incPrice - netPrice;
+        const fee = eligible ? Math.round(incPrice * feePct / 100) : 0;
+        const refund = eligible ? Math.max(0, tax - fee) : 0;
+        const finalJpy = incPrice - refund;
+
+        const chargeTwd = incPrice * rate;
+        const refundTwd = refund * rate;
+        const finalTwd = finalJpy * rate;
+        const cardBenefit = finalTwd * netRewardRate;
+
+        setText('chargeJpy', `¥ ${incPrice.toLocaleString()}`);
+        setText('chargeTwd', ntd(chargeTwd));
+        setText('refundJpy', `¥ ${refund.toLocaleString()}`);
+        setText('refundTwd', ntd(refundTwd));
+        setText('finalForeign', `¥ ${finalJpy.toLocaleString()}`);
+        setText('finalTwd', ntd(finalTwd));
+        setText('cardBenefit', ntd(cardBenefit));
+        setText('totalSavedTwd', ntd(refundTwd + cardBenefit));
+      } else {
+        const sym = CURRENCY_CONFIG[currentCur].symbol;
+        const twd = amount * rate;
+        const benefit = twd * netRewardRate;
+        setText('finalForeign', `${sym} ${amount.toLocaleString()}`);
+        setText('finalTwd', ntd(twd));
+        setText('cardBenefit', ntd(benefit));
+        setText('totalSavedTwd', ntd(benefit));
+      }
+    }
+
+    function renderLadder() {
+      const rate = getCurrentRate();
+      const mag = CURRENCY_CONFIG[currentCur].magnitude;
+      const sym = CURRENCY_CONFIG[currentCur].symbol;
+
+      let fLadder = [1000, 3000, 5000, 10000, 20000, 30000, 50000, 100000];
+      if (mag === 'large')  fLadder = [10, 50, 100, 200, 500, 1000, 2000, 5000];
+      if (mag === 'medium') fLadder = [100, 300, 500, 1000, 2000, 5000, 10000, 20000];
+      if (mag === 'micro')  fLadder = [10000, 50000, 100000, 500000, 1000000, 2000000, 5000000, 10000000];
+      const twdLadder = [500, 1000, 2000, 3000, 5000, 10000, 20000, 30000];
+
+      document.getElementById('ladderBody').innerHTML = fLadder.map((f, i) => {
+        const t = twdLadder[i];
+        const rev = Number((t / rate).toFixed(mag === 'large' ? 1 : 0));
+        return `<tr>
+          <td>${sym}${f.toLocaleString()}</td>
+          <td>NT$${Math.round(f * rate).toLocaleString()}</td>
+          <td>NT$${t.toLocaleString()}</td>
+          <td>${sym}${rev.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function toggleLadderTable() {
+      const sec = document.getElementById('ladderSection');
+      sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+    }
+
+    let toastTimer;
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.innerText = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+    }
+
+    // ===== 安裝到主畫面提示 =====
+    let deferredPrompt = null;
+    function isStandalone() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+    function setupInstallHint() {
+      if (isStandalone() || load('fx_install_dismissed')) return;
+      const ua = navigator.userAgent;
+      const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        document.getElementById('installHint').innerHTML = '用 <b>Safari</b> 開啟 → 點下方「分享」⬆️ → 選「<b>加入主畫面</b>」。';
+        document.getElementById('installCard').style.display = 'block';
+      }
+    }
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (isStandalone() || load('fx_install_dismissed')) return;
+      document.getElementById('installHint').innerHTML =
+        '<div class="row" style="margin-top:6px;"><span>安裝後可像 App 一樣從桌面開啟。</span><button onclick="doInstall()">安裝</button></div>';
+      document.getElementById('installCard').style.display = 'block';
+    });
+    async function doInstall() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('installCard').style.display = 'none';
+    }
+    function dismissInstall() {
+      store('fx_install_dismissed', true);
+      document.getElementById('installCard').style.display = 'none';
+    }
+    window.addEventListener('appinstalled', () => { document.getElementById('installCard').style.display = 'none'; });
+
+    // ===== 註冊離線快取 =====
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
